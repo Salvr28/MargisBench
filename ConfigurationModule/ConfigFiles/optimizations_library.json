@@ -1,0 +1,6 @@
+{
+    "Quantization": ["QInt8", "8float", "16int", "16float"],
+    "Pruning": ["Random", "LnStructured"],
+    "Distillation": [true, false]
+}
+
