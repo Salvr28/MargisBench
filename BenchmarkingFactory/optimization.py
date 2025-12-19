@@ -11,6 +11,7 @@ import torch
 import torch_pruning as tp
 import torch.nn as nn
 import torch.nn.utils.prune as prune
+import torch.optim as optim
 from abc import ABC, abstractmethod
 from pathlib import Path
 from copy import deepcopy
@@ -20,6 +21,8 @@ from BenchmarkingFactory.calibrationDataReader import CustomCalibrationDataReade
 from BenchmarkingFactory.dataWrapper import DataWrapper
 from BenchmarkingFactory.aiModel import AIModel
 from PlatformContext.platform_context import PlatformContext
+from Utils.utilsFunctions import trainEpoch, checkModelExistence
+
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -44,32 +47,63 @@ class PruningOptimization(Optimization):
         self.current_aimodel = None
         self.optimization_config = optimization_config
 
-    def applyOptimization(self, input_loader, config_id=None):
+    def applyOptimization(self, input_examples=None, fine_tune_loader=None, config_id=None) -> (object, bool):
         """
-        Apply structural pruning using data from the loader for shape inference.
-        
+        Apply the optimization quantization configured with config, to the aiModel attached
+
         Input:
-            - input_loader: DataLoader to fetch a sample input batch (for shape detection)
-        """ 
+            - input_loader: Input examples for pruned model
+            - fine_tune_loader: Fine tune loader for pruning retraining
+            - config_id: the hash value of the configuration
+        Output:
+            -optimized_model: aiModel optimized with dynamic or static quantization
+            -already_exits: boolean
+        """
 
         logger.debug(f"-----> [OPTIMIZATION MODULE] APPLY STRUCTURAL PRUNING")
+
 
         if not self.current_aimodel:
             raise MissingAIModelError("No AIModel set.")
 
-        current_model_info = self.current_aimodel.getAllInfo()
-        pruned_model_info = deepcopy(current_model_info)
-        pruned_aimodel = AIModel(pruned_model_info)
-        model_to_prune = pruned_aimodel.getModel()
+        #Setting 1 single thread for memory saving
+        os.environ["OMP_NUM_THREADS"] = "1"
+        os.environ["MKL_NUM_THREADS"] = "1" 
+
 
         method = self.getOptimizationInfo('method')
         device = self.current_aimodel.getInfo('device')
         amount = self.getOptimizationInfo('amount')
+
+        current_model_info = self.current_aimodel.getAllInfo()
+        pruned_model_info = deepcopy(current_model_info)
+        pruned_aimodel = AIModel(pruned_model_info)
+        pruned_aimodel.getAllInfo()['model_name'] += "_pruned"
+        pruned_aimodel.getAllInfo()['description'] += f"(Structurally Pruned amount {amount})"
+
+        if checkModelExistence(pruned_aimodel, config_id):
+            return (pruned_aimodel, True)
+
+        model_to_prune = pruned_aimodel.getModel()
+
+       
+
+
+        #for Fine Tuning
+        steps=3 #TODO: the step i a parameter!
+        #optimizer = optim.SGD([p for p in model_to_prune.parameters() if p.requires_grad], lr=0.01, momentum=0.7)
+        optimizer = optim.Adam([p for p in model_to_prune.parameters() if p.requires_grad], lr=0.01)
+        criterion = nn.CrossEntropyLoss()
+        #for Fine Tuning
+
+        optimizer.zero_grad(set_to_none=True)
+
+        
         if method != "Random":
             n = self.getOptimizationInfo('n')
 
         try:
-            batch = next(iter(input_loader))
+            batch = next(iter(input_examples))
             if isinstance(batch, (list, tuple)):
                 example_inputs = batch[0]
             else:
@@ -93,27 +127,41 @@ class PruningOptimization(Optimization):
             model_to_prune,
             example_inputs,
             importance=imp,
-            iterative_steps=1,    
+            iterative_steps= steps,    
             pruning_ratio=amount, 
             round_to=8,  
             ignored_layers=ignored_layers,
         )
 
-        # Execute Pruning
-        logger.info(f"Pruning model with structural pruning... Target Sparsity: {amount}")
-        pruner.step() 
+        del example_inputs
+        gc.collect()
         
+        # Execute Pruning
+        logger.info(f"Pruning model with structural pruning... Target Sparsity: {amount}. Doing the pruning in {steps} steps...")
+
+        for i in range(steps):
+            pruner.step() 
+            #Fine Tuning
+
+            trainEpoch(model_to_prune, fine_tune_loader, criterion, optimizer, pruned_model_info["device"])
+
+            optimizer.zero_grad(set_to_none=True)
+            
+        del pruner
+        del optimizer
+        del criterion
+        gc.collect()
+
         # Check the result
         logger.debug(f"Model physically shrunk. New structure applied.")
 
         logger.info(f"PRUNING APPLIED WITH {method}, on {amount*100}% of the nodes on {current_model_info['model_name']}")
 
-        pruned_aimodel.getAllInfo()['model_name'] += "_pruned"
-        pruned_aimodel.getAllInfo()['description'] += f"(Structurally Pruned amount {amount})"
+        
         
         logger.debug(f"<----- [OPTIMIZATION MODULE] DONE")
 
-        return pruned_aimodel
+        return pruned_aimodel, False
 
     def __getImportanceMethod(self, method: str):
         """
@@ -190,17 +238,29 @@ class QuantizationOptimization(Optimization):
         """
         self.current_aimodel =  AIModel
 
-    def applyOptimization(self, input_examples, config_id=None):
+    def applyOptimization(self, input_examples=None, fine_tune_loader=None, config_id=None) -> (object, bool):
         """
         Apply the optimization quantization configured with config, to the aiModel attached
 
         Input:
-            -N.A.
-
-            Output:
-                -optimized_model: aiModel optimized with dynamic or static quantization
-            """
+            - input_example: None
+            - fine_tune_loader: None
+            - config_id: the hash value of the configuration
+        Output:
+            -optimized_model: aiModel optimized with dynamic or static quantization
+        """
             
+        current_model_info = self.current_aimodel.getAllInfo()
+        quantized_model_info = deepcopy(current_model_info)
+        quantized_aimodel = AIModel(quantized_model_info)
+        quantized_aimodel.getAllInfo()['model_name'] += "_quantized"
+        quantized_aimodel.getAllInfo()['description'] += f"(Statically Quantized with bit_method:{self.getOptimizationInfo('method')})"
+
+
+        if checkModelExistence(quantized_aimodel, config_id):
+            return (quantized_aimodel, True)
+
+        
         logger.debug(f"-----> [OPTIMIZATION MODULE] APPLY QUANTIZATION OPTIMIZATION")
 
         os.environ["OMP_NUM_THREADS"] = "1"
@@ -218,28 +278,20 @@ class QuantizationOptimization(Optimization):
         device = self.current_aimodel.getInfo('device')
         model_name = self.current_aimodel.getInfo('model_name')
         bit_method = self.getOptimizationInfo('method')
-        quant_type = self.getOptimizationInfo('type')
 
-        current_model_info = self.current_aimodel.getAllInfo()
-        quantized_model_info = deepcopy(current_model_info)
+        
 
         logger.debug(f"Creating a copy of the model {current_model_info['model_name']}")
-        quantized_aimodel = AIModel(quantized_model_info)
 
-        match quant_type:
-            case "static":
-                res = self.__staticQuantizationOnnx(model_name, device, input_examples, config_id)   
-            
-            case "dynamic":
-                pass
+        
+        res = self.__staticQuantizationOnnx(model_name, device, input_examples, bit_method, config_id)
 
-        quantized_aimodel.getAllInfo()['model_name'] += "_quantized"
-        quantized_aimodel.getAllInfo()['description'] += f"(Quantized with type:{self.getOptimizationInfo('type')} ; bit_method:{self.getOptimizationInfo('method')})"
+        
         logger.debug(f"<----- [OPTIMIZATION MODULE] APPLY QUANTIZATION OPTIMIZATION")
 
-        return quantized_aimodel
+        return quantized_aimodel, True
 
-    def __staticQuantizationOnnx(self, model_name, device, inputs, config_id):
+    def __staticQuantizationOnnx(self, model_name, device, inputs, bit_method, config_id):
         """
         Apply Static Quantization with ONNX
         """  
@@ -247,7 +299,7 @@ class QuantizationOptimization(Optimization):
         model_path = str(PROJECT_ROOT / "ModelData" / "ONNXModels" / f"{config_id}"  / f"{model_name}.onnx")
         model_prep_path = str(PROJECT_ROOT / "ModelData" / "ONNXModels" / f"{config_id}" / f"{model_name}_prep.onnx")
         model_quantized_path = str(PROJECT_ROOT / "ModelData" / "ONNXModels" / f"{config_id}" /f"{model_name}_quantized.onnx")
-
+        weight_type = getattr(quantization.QuantType, bit_method)
         onnx.shape_inference.infer_shapes_path(model_path, model_prep_path)
 
         # Cleaning memory after inference shape
@@ -277,29 +329,21 @@ class QuantizationOptimization(Optimization):
         # Calibration dataset
         qdr = CustomCalibrationDataReader(inputs, input_name = "input")
 
-        logger.info("Starting Static Quantization (QOperator)...")
+        logger.info(f"Starting Static Quantization | {bit_method} (QOperator)...")
 
         quantized_model = quantization.quantize_static(
             model_input=model_prep_path,
             model_output=model_quantized_path,
             calibration_data_reader=qdr,
             quant_format = q_format,
-            per_channel=True,
-            weight_type = quantization.QuantType.QInt8,
+            per_channel=False,
+            weight_type = weight_type,
             activation_type= quantization.QuantType.QUInt8,
             extra_options=q_static_opts
         )
 
-        final_model = onnx.load(model_quantized_path)
-        if not final_model.graph.value_info:
-            logger.error(f"No intermediate shape info found!!!")
-        else:
-            logger.debug(f"Found {len(final_model.graph.value_info)} nodes with shape info.")
-            logger.debug(final_model.graph.value_info[0])
-
         logger.info("Quantization Complete")
 
-        del final_model
         del qdr
         gc.collect()
 
@@ -307,6 +351,7 @@ class QuantizationOptimization(Optimization):
             return True
         else:
             return False
+
 
 class DistillationOptimization(Optimization):
 
@@ -318,7 +363,7 @@ class DistillationOptimization(Optimization):
         self.current_aimodel = None
         self.optimization_config = optimization_config
 
-    def applyOptimization(self, input_examples=None, config_id=None):
+    def applyOptimization(self, input_examples=None, fine_tune_loader=None, config_id=None) -> (object, bool):
         """
         Function that load the correct distilled version of the current AIModel
         """
@@ -336,19 +381,21 @@ class DistillationOptimization(Optimization):
         num_classes = current_info['num_classes']
         custom_weights_path = self.getOptimizationInfo('distilled_paths')[model_name]
 
-        logger.info(f"Creating structure for: {model_name}")
 
         # Creating new info to pass to the new model
         distilled_info = deepcopy(current_info)
         distilled_info['model_name'] = current_info['model_name'] + "_distilled"
         distilled_info['weights_path'] = custom_weights_path 
         
+        logger.info(f"CREATING STRUCTURE FOR {model_name}_distilled...")
+
+
         # Create new model with correct distilled weights
         distilled_aimodel = AIModel(distilled_info)
 
         logger.debug(f"<----- [OPTIMIZATION MODULE] APPLY DISTILLATION OPTIMIZATION")
 
-        return distilled_aimodel
+        return distilled_aimodel, False
         
 
     def getOptimizationInfo(self, info: str):

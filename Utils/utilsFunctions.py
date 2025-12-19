@@ -12,6 +12,9 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from subprocess import run, DEVNULL
 from json import dump, load, JSONDecodeError
+import torch.nn as nn
+from tqdm import tqdm
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -158,6 +161,51 @@ def initialPrint(topic: str) -> None:
     """
 
     print("\n\t\t"+ '\x1b[35m' + topic + '\033[0m')
+
+def trainEpoch(model: object, loader: object, criterion: object, optimizer: object, device: object):
+    """
+    Function useful for re-training after pruning optimization. 
+
+    Input:
+        - model
+
+    """
+    model.train()
+
+    #Freezing parameters, unfreezing classifier.
+    for param in model.parameters():
+            param.requires_grad = False
+
+    # This finds the last linear layer we just added and unfreezes it.
+    for name, module in model.named_modules():
+        if isinstance(module, nn.Linear):
+            for param in module.parameters():
+                param.requires_grad = True
+
+    running_loss = 0.0
+    for inputs, labels in tqdm(loader):
+        inputs, labels = inputs.to(device), labels.to(device)
+        optimizer.zero_grad()
+        #nn.functional.dropout(inputs, p=0.5, training=True)
+        loss = criterion(model(inputs), labels)
+        loss.backward()
+        optimizer.step()
+        running_loss += loss.item() * inputs.size(0)
+    return running_loss / len(loader.dataset)
+
+
+
+def checkModelExistence(aimodel: object, config_id: str)-> bool:
+
+    model_name = aimodel.getAllInfo()['model_name']
+    onnx_directory_path = PROJECT_ROOT / "ModelData" / "ONNXModels" / f"{config_id}" 
+    onnx_model_path = onnx_directory_path /f"{model_name}.onnx"
+
+    if onnx_model_path.exists():
+        logger.info(f"ONNX file of {model_name} already exists at {onnx_model_path}")
+        return True #TO PASS THE CREATION IF IT ALREADY EXISTS 
+
+    return False
 
 
 def pickAPlatform() -> (str, int):
