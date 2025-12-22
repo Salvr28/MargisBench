@@ -9,6 +9,7 @@ import torch
 import json
 import math
 import gc
+import sys
 import traceback
 import pingouin as pingu
 from pathlib import Path
@@ -32,7 +33,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 from Utils.utilsFunctions import cleanCaches
 
 #For Example Purposes
-from ProbeHardwareModule.probeHardwareManager import ProbeHardwareManager
+#from ProbeHardwareModule.probeHardwareManager import ProbeHardwareManager
 from PackageDownloadModule.packageDownloadManager import PackageDownloadManager
 
 
@@ -219,15 +220,16 @@ class DoE():
             dataset = self.__dataset #creating the dedicated dataWrapper for the model
             dataset.loadInferenceData(model_info=model_dict['Base'].getAllInfo(), dataset_info=self.__dataset_info)
             inference_loader = dataset.getLoader()
+            finetune_loader = dataset.getFineTuningLoader()
             self.__inference_loaders[model_dict['Base'].getInfo("model_name")]=inference_loader #N Base Models = N Loaders
             model_dict['Base'].createOnnxModel(inference_loader, self.__config_id)
 
             #Optimized Model...
             for optimizator, op_name in self.__optimizations:
                 optimizator.setAIModel(model_dict['Base'])
-                optimized_model = optimizator.applyOptimization(inference_loader, self.__config_id)
+                optimized_model, already_created = optimizator.applyOptimization(inference_loader, finetune_loader, self.__config_id)
 
-                if not optimized_model.getInfo("model_name").endswith("quantized"):
+                if not optimized_model.getInfo("model_name").endswith("quantized") and not already_created:
                     optimized_model.createOnnxModel(inference_loader, self.__config_id)
 
                 #optimized_models.append(optimized_model)
@@ -381,7 +383,7 @@ class DoE():
                 results_list.append({
                     "Model": mod_name,
                     "Optimization": opt_name,
-                    "Total_Inference_Time_ms": float('inf')
+                    "Total_Inference_Time_ms": sys.float_info.max
                 })
                 
 
@@ -560,9 +562,9 @@ if __name__ == "__main__":
         "platform": "generic"
     }
 
-    probe = ProbeHardwareManager()
+   # probe = ProbeHardwareManager()
 
-    there_is_gpu, gpu_type, sys_arch = probe.checkSystem()
+   # there_is_gpu, gpu_type, sys_arch = probe.checkSystem()
 
     context = PlatformContext()
     config_id = context.createConfigFile(config)

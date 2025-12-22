@@ -15,6 +15,7 @@ from pathlib import Path
 from hashlib import sha512
 from platform import uname
 from abc import ABC, abstractmethod
+from datetime import datetime
 from Utils.utilsFunctions import getLongestSubString, getFilenameList, initialPrint
 
 
@@ -349,7 +350,7 @@ class ConfigManager(ABC):
             self._addArchType(config)
 
             self._printConfigFile(config, " FINAL CONF. FILE ")
-            hash_value = str(sha512(str(config).encode("utf-8")).hexdigest()) + "_" + self._platform
+            hash_value = str(sha512(str(config).encode("utf-8")).hexdigest())[:12] + "_" + self._platform
             self._updateConfigHistory(config, hash_value)
             #Arch for Quantization Optimization
             self._addArchType(config)
@@ -397,7 +398,8 @@ class ConfigManager(ABC):
             logger.info(f"SAVED!")
 
             
-            hash_value = str(sha512(str(config).encode("utf-8")).hexdigest())[:10] + "_" + self._platform
+            hash_value = str(sha512(str(config).encode("utf-8")).hexdigest())[:12] + "_" + self._platform
+
             self._updateConfigHistory(config, hash_value)
             return hash_value
         else:
