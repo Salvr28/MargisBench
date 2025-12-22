@@ -90,7 +90,7 @@ class PruningOptimization(Optimization):
 
 
         #for Fine Tuning
-        steps=3 #TODO: the step i a parameter!
+        steps=1 #TODO: the step i a parameter!
         #optimizer = optim.SGD([p for p in model_to_prune.parameters() if p.requires_grad], lr=0.01, momentum=0.7)
         optimizer = optim.Adam([p for p in model_to_prune.parameters() if p.requires_grad], lr=0.01)
         criterion = nn.CrossEntropyLoss()
