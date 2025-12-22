@@ -41,10 +41,6 @@
         }
     ],
     "optimizations": {
-        "Quantization": {
-            "method": "QInt8",
-            "type": "static"
-        },
         "Pruning": {
             "method": "LnStructured",
             "n": 1,
@@ -53,9 +49,9 @@
         "Distillation": {
             "method": true,
             "distilled_paths": {
-                "mobilenet_v2": "/home/salvatore/Desktop/MargisBench/ModelData/Weights/mobilenet_v2_distilled.pth",
-                "efficientnet": "/home/salvatore/Desktop/MargisBench/ModelData/Weights/efficientnet_b0_distilled.pth",
-                "mnasnet1_0": "/home/salvatore/Desktop/MargisBench/ModelData/Weights/mnasnet1_0_distilled.pth"
+                "mobilenet_v2": "/home/frabru99/Sync/MasterThesis/MargisBench/ModelData/Weights/mobilenet_v2_distilled.pth",
+                "efficientnet": "/home/frabru99/Sync/MasterThesis/MargisBench/ModelData/Weights/efficientnet_b0_distilled.pth",
+                "mnasnet1_0": "/home/frabru99/Sync/MasterThesis/MargisBench/ModelData/Weights/mnasnet1_0_distilled.pth"
             }
         }
     },
@@ -64,6 +60,6 @@
         "batch_size": 1
     },
     "repetitions": 2,
-    "platform": "generic",
+    "platform": "fusion",
     "arch": "x86_64"
 }

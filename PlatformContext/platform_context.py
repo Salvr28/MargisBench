@@ -45,8 +45,8 @@ class PlatformContext():
 
                 acceleratorWarning()
 
+                self.__configurationManager = ConfigManagerCoral(self.__platform)
                 self.__packageDownloadManager = PackageDownloadManagerCoral()
-                self.__configurationManager = ConfigurationManagerCoral()
                 #self.__runnerModule = RunnerModuleCoral()
                 #self.__statsModule = StatsModuleCoral() 
 
@@ -58,7 +58,7 @@ class PlatformContext():
 
                 acceleratorWarning()
 
-                self.__configurationManager = ConfigurationManagerFusion()
+                self.__configurationManager = ConfigManagerFusion(self.__platform)
                 self.__packageDownloadManager = PackageDownloadManagerFusion()
                 #self.__runnerModule = RunnerModuleFusion()
                 #self.__statsModule = StatsModuleFusion()

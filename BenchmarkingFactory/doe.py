@@ -540,10 +540,10 @@ if __name__ == "__main__":
             }
         ],
         "optimizations": {
-            "Quantization": {
-                "method": "QInt8",
-                "type": "static"
-            }, 
+            # "Quantization": {
+            #     "method": "QInt8",
+            #     "type": "static"
+            # }, 
             "Pruning": {
                 "method": "LnStructured",
                 'n': 1, 
