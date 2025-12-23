@@ -242,4 +242,20 @@ def acceleratorWarning() -> None:
     logger.warning(f"\nThe target platform is fournished with accelerator. All the models will be quantized. 'Quantization' optimization field is not allowed.\n")
     input("\nPress a key to continue...")
 
+def createPathDirectory(path):
+
+    if path.exists():
+        if path.is_dir():
+            logger.info("Directory already exists.")
+        else:
+            logger.info("Path exists but it is a file, not a directory!")
+    else:
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            logger.info("Direcotyr create successfully")
+        except PermissionError:
+            logger.error("Error: You do not have permission to create this directory")
+        except Exception as e:
+            logger.error(f"An error occured during the creation of Directory {path}: {e}")
+
 
