@@ -74,6 +74,7 @@ class DoE():
             self.__ran=False
             self.__context = context
             self.__config_id = config_id
+            self.__steps = config.get("optimizations", {}).get("Pruning", {}).get("epochs", 0)
             self.__repetitions = config["repetitions"] # Must be added to the general config
             self.__model_info=config["models"]
             self.__optimizations_info=config["optimizations"]
@@ -227,7 +228,7 @@ class DoE():
             #Optimized Model...
             for optimizator, op_name in self.__optimizations:
                 optimizator.setAIModel(model_dict['Base'])
-                optimized_model, already_created = optimizator.applyOptimization(inference_loader, finetune_loader, self.__config_id)
+                optimized_model, already_created = optimizator.applyOptimization(self.__steps, inference_loader, finetune_loader, self.__config_id)
 
                 if not optimized_model.getInfo("model_name").endswith("quantized") and not already_created:
                     optimized_model.createOnnxModel(inference_loader, self.__config_id)
@@ -375,7 +376,6 @@ class DoE():
                     "Model": mod_name,
                     "Optimization": opt_name,
                     "Total_Inference_Time_ms": stats["Total 'kernel' inference time"]
-
                 })
             else:
                 logger.error(f"During single inference something went wrong!")
@@ -387,7 +387,6 @@ class DoE():
                 })
                 
 
-        self.__ran=True
 
         df = DataFrame(results_list)
         df.to_csv("doe_results_raw.csv", index = False)
@@ -540,14 +539,15 @@ if __name__ == "__main__":
             }
         ],
         "optimizations": {
-            "Quantization": {
-                "method": "QInt8",
-                "type": "static"
-            }, 
+            # "Quantization": {
+            #     "method": "QInt8",
+            #     "type": "static"
+            # }, 
             "Pruning": {
                 "method": "LnStructured",
                 'n': 1, 
-                "amount": 0.1
+                "amount": 0.1,
+                "epochs": 2
             },
             "Distillation":{
                 "method": True,
@@ -559,7 +559,6 @@ if __name__ == "__main__":
             "batch_size": 1
         },
         "repetitions": 2,
-        "platform": "generic"
     }
 
    # probe = ProbeHardwareManager()

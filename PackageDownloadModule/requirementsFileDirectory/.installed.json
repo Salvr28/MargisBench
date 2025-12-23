@@ -1,5 +1,5 @@
 {
     "generic": true,
-    "coral": false,
-    "fusion": false
+    "coral": true,
+    "fusion": true
 }
