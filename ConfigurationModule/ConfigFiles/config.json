@@ -44,7 +44,8 @@
         "Pruning": {
             "method": "LnStructured",
             "n": 1,
-            "amount": 0.1
+            "amount": 0.1,
+            "epochs": 2
         },
         "Distillation": {
             "method": true,

@@ -28,6 +28,9 @@ requirements_installed_path= str(PROJECT_ROOT / "PackageDownloadModule" / "requi
 
 class PackageDownloadManager(ABC):
 
+    @abstractmethod
+    def __init__():
+        self._builder=venv.EnvBuilder(with_pip=True)
     
     @abstractmethod
     def _checkAlreadyInstalled(self) -> (bool, bool):
@@ -148,6 +151,7 @@ class PackageDownloadManagerCoral(PackageDownloadManager):
             self._deps_dir = Path(requirements_file_directory) / "Coral"
             self._converter_dir = Path(converters_file_directory) / "CoralConverter"
             self._converter_venv_dir = Path(self._converter_dir) / "venv"
+            self._builder = venv.EnvBuilder(with_pip=True) #for venv
 
 
 
@@ -196,8 +200,7 @@ class PackageDownloadManagerCoral(PackageDownloadManager):
 
                 logger.info(f"INSTALLED BASIC DEPENDENCIES! PASSING TO {platform.upper()} CONVERTER ONES...")
 
-                builder = venv.EnvBuilder(with_pip=True) #for venv
-                builder.create(self._converter_venv_dir)
+                self._builder.create(self._converter_venv_dir)
 
                 logger.info(f"VIRTUAL ENV FOR {self._platform} CONVERTER CREATED. INSTALLING DEPENDENCIES...\n")
 
@@ -223,6 +226,7 @@ class PackageDownloadManagerFusion(PackageDownloadManager):
             self._deps_dir = Path(requirements_file_directory) / "Fusion"
             self._converter_dir = Path(converters_file_directory) / "FusionConverter"
             self._converter_venv_dir = Path(self._converter_dir) / "venv"
+            self._builder = venv.EnvBuilder(with_pip=True) #for venv
 
 
         def _checkAlreadyInstalled(self) -> (bool, bool):
@@ -270,8 +274,7 @@ class PackageDownloadManagerFusion(PackageDownloadManager):
 
                 logger.info(f"INSTALLED BASIC DEPENDENCIES! PASSING TO {platform.upper()} CONVERTER ONES...")
 
-                builder = venv.EnvBuilder(with_pip=True) #for venv
-                builder.create(self._converter_venv_dir)
+                self._builder.create(self._converter_venv_dir)
 
                 logger.info(f"VIRTUAL ENV FOR {self._platform} CONVERTER CREATED. INSTALLING DEPENDENCIES...\n")
 

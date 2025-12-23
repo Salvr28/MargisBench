@@ -83,13 +83,18 @@
             "Pruning": {
                 "description": "Pruning level object", 
                 "type": "object",
-                "required": ["method", "amount"],
+                "required": ["method", "amount", "epochs"],
                 "properties":{
                     "method": {"type": "string"},
                     "amount": {
                         "type": "number",
                         "exclusiveMinimum": 0,
                         "maximum": 1
+                    },
+                    "epochs": {
+                        "description": "Number of epochs choosen for retraining after structured pruning",
+                        "type": "integer",
+                        "exclusiveMinimum": 0 
                     }, 
                     "n": {
                         "type": "integer",

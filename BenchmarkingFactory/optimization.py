@@ -47,7 +47,7 @@ class PruningOptimization(Optimization):
         self.current_aimodel = None
         self.optimization_config = optimization_config
 
-    def applyOptimization(self, input_examples=None, fine_tune_loader=None, config_id=None) -> (object, bool):
+    def applyOptimization(self, steps=None, input_examples=None, fine_tune_loader=None, config_id=None) -> (object, bool):
         """
         Apply the optimization quantization configured with config, to the aiModel attached
 
@@ -90,7 +90,7 @@ class PruningOptimization(Optimization):
 
 
         #for Fine Tuning
-        steps=1 #TODO: the step i a parameter!
+        steps=steps
         #optimizer = optim.SGD([p for p in model_to_prune.parameters() if p.requires_grad], lr=0.01, momentum=0.7)
         optimizer = optim.Adam([p for p in model_to_prune.parameters() if p.requires_grad], lr=0.01)
         criterion = nn.CrossEntropyLoss()
@@ -238,7 +238,7 @@ class QuantizationOptimization(Optimization):
         """
         self.current_aimodel =  AIModel
 
-    def applyOptimization(self, input_examples=None, fine_tune_loader=None, config_id=None) -> (object, bool):
+    def applyOptimization(self, steps=None, input_examples=None, fine_tune_loader=None, config_id=None) -> (object, bool):
         """
         Apply the optimization quantization configured with config, to the aiModel attached
 
@@ -363,7 +363,7 @@ class DistillationOptimization(Optimization):
         self.current_aimodel = None
         self.optimization_config = optimization_config
 
-    def applyOptimization(self, input_examples=None, fine_tune_loader=None, config_id=None) -> (object, bool):
+    def applyOptimization(self, steps=None, input_examples=None, fine_tune_loader=None, config_id=None) -> (object, bool):
         """
         Function that load the correct distilled version of the current AIModel
         """
