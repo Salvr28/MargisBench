@@ -61,6 +61,6 @@
         "batch_size": 1
     },
     "repetitions": 2,
-    "platform": "fusion",
+    "platform": "generic",
     "arch": "x86_64"
 }
