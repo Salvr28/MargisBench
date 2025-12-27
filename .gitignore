@@ -16,3 +16,5 @@ Plots/*.png
 *.index
 *.data*
 *.npy
+*.har
+*.hef

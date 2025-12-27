@@ -48,6 +48,11 @@ class CoralInizializer():
 
             arg_set.append(model_config['model_name'])
             arg_set.append(weights)
+
+            # Batch size and Image size
+            arg_set.append(self.getConfig()['dataset']['batch_size'])
+            arg_set.append(model_config['image_size'])
+
             args_sets.append(arg_set)
 
         for args in args_sets:

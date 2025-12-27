@@ -547,7 +547,7 @@ if __name__ == "__main__":
                 "method": "LnStructured",
                 'n': 1, 
                 "amount": 0.1,
-                "epochs": 2
+                "epochs": 1
             },
             "Distillation":{
                 "method": True,

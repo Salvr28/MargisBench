@@ -1,0 +1,2 @@
+pre_quantization_optimization(global_avgpool_reduction, layers=[avgpool1], division_factors=[2, 2])
+performance_param(compiler_optimization_level=0)

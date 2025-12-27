@@ -13,11 +13,12 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 # --- CONFIGURATION ---
 DATA_DIR = str(PROJECT_ROOT / "ModelData" / "Dataset" / "casting_data")
-BATCH_SIZE = 1 
-IMAGE_SIZE = 224
 NUM_SAMPLES = 200 
 
-def generate_calibration_data(model_name, model_weights):
+def generate_calibration_data(model_name, model_weights, batch_size, image_size):
+
+    BATCH_SIZE = batch_size
+    IMAGE_SIZE = image_size
 
     # Getting the Image Transformations (Normalization, Resize etc) from officials
     module = import_module("torchvision.models")
@@ -72,7 +73,9 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     model_name = args[0]
     model_weights = args[1]
+    batch_size = args[2]
+    image_size = args[3]
 
     print (f"I get the following args: {model_name} | {model_weights}")
 
-    generate_calibration_data(model_name, model_weights)
+    generate_calibration_data(model_name, model_weights, batch_size, image_size)

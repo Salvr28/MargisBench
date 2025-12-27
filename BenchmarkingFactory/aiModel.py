@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import onnxruntime as ort
 from numpy import float32
-from os import remove, mkdir, getpid
+from os import remove, mkdir, getpid, umask
 from importlib import import_module
 #from psutil import Process
 from pathlib import Path
@@ -235,7 +235,9 @@ class AIModel():
 
 
         if not onnx_directory_path.exists():
-            mkdir(onnx_directory_path)
+            old_umask = umask(0)
+            mkdir(onnx_directory_path, mode=0o777)
+            umask(old_umask)
 
         if onnx_model_path.exists():
             logger.info(f"ONNX FILE OF {model_name} ALREADY EXISTS AT {onnx_model_path}")

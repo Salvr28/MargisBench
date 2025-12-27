@@ -45,7 +45,7 @@
             "method": "LnStructured",
             "n": 1,
             "amount": 0.1,
-            "epochs": 2
+            "epochs": 1
         },
         "Distillation": {
             "method": true,
@@ -61,6 +61,6 @@
         "batch_size": 1
     },
     "repetitions": 2,
-    "platform": "generic",
+    "platform": "fusion",
     "arch": "x86_64"
 }
