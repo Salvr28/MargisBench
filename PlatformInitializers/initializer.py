@@ -17,7 +17,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # TODO 
 # Continue creation of directory during convertion
 # Then compile every converted model for edge tpu
-# Finally inject in coral data, scripts and models
+# Finally inject in coral data, scripts and models 
 
 #####
 
@@ -28,7 +28,7 @@ class Initializers():
     def initialize():
         pass
 
-class CoralInizializer():
+class CoralInizializer(Initializers):
 
     def __init__(self, config, config_id):
 
@@ -36,7 +36,7 @@ class CoralInizializer():
         self.__config = config
         self.__config_id = config_id
 
-    def createCalibrationData(self):
+    def __createCalibrationData(self):
 
         calibration_script_path = str(PROJECT_ROOT / "Converters" / "CoralConverter" / "Calibration" / "calibration_data.py")
 
@@ -50,8 +50,8 @@ class CoralInizializer():
             arg_set.append(weights)
 
             # Batch size and Image size
-            arg_set.append(self.getConfig()['dataset']['batch_size'])
-            arg_set.append(model_config['image_size'])
+            arg_set.append(str(self.getConfig()['dataset']['batch_size']))
+            arg_set.append(str(model_config['image_size']))
 
             args_sets.append(arg_set)
 
@@ -59,7 +59,7 @@ class CoralInizializer():
             logger.info(f"Creating calibration data with these args: {args}")
             subprocess.run([sys.executable, calibration_script_path] + args)
 
-    def createCoralModels(self):
+    def __createCoralModels(self):
         # Setup venv paths
         venv_root = PROJECT_ROOT / "Converters" / "CoralConverter" / "venv"
         venv_bin = venv_root / "bin"
@@ -127,7 +127,7 @@ class CoralInizializer():
                     logger.warning(f"Expected optimized model {opti_onnx} not found. Skipping.")
 
 
-    def compileCoralModelsForEdgeTPU(self):
+    def __compileCoralModelsForEdgeTPU(self):
 
         compiler_bin = str(PROJECT_ROOT / "Converters" / "CoralConverter" / "coral_compiler" / "x86_64" / "edgetpu_compiler")
         
@@ -174,8 +174,10 @@ class CoralInizializer():
                 else:
                     logger.warning(f"TFLite source for {opti_key} not found at {opti_tflite_path}. Skipping compilation.")  
 
-
-
+    def initialize(self):
+        self.__createCalibrationData()
+        self.__createCoralModels()
+        self.__compileCoralModelsForEdgeTPU()
 
 
     def getConfig(self):
@@ -184,9 +186,87 @@ class CoralInizializer():
     def getConfigID(self):
         return self.__config_id
 
+
+class FusionInitializer(Initializers):
+
+    def __init__(self, config, config_id):
+
+        self.__config = config
+        self.__config_id = config_id
+
+    def __createCalibrationData(self):
+        """
+        This function calls the script in order to create the Calibration Data, 
+        that are useful for the quantization of the models.
+        """
+
+        calibration_script_path = str(PROJECT_ROOT / "Converters" / "FusionConverter" / "Calibration" / "calibration_data.py")
+
+        args_sets = []
+        for model_config in self.getConfig()["models"]:
+            arg_set = []
+            weights = model_config['weights_class']
+            weights = weights.split(".")[0]
+
+            arg_set.append(model_config['model_name'])
+            arg_set.append(weights)
+
+            # Batch size and Image size
+            arg_set.append(str(self.getConfig()['dataset']['batch_size']))
+            arg_set.append(str(model_config['image_size']))
+
+            args_sets.append(arg_set)
+
+        for args in args_sets:
+            logger.info(f"Creating calibration data with these args: {args}")
+            subprocess.run([sys.executable, calibration_script_path] + args)
+
+
+
+    def __createFusionModels(self): 
+        """
+        This unique function starts a container in order to execute pipeline of commands inside it, to obtain the 
+        compiled files. 
+
+        """
+
+        hailo_container_bash_path = "./" / PROJECT_ROOT / "Converters" / "FusionConverter" / "fusion_compiler" / "hailo_ai_sw_suite_docker_run.sh"
+
+        try:
+
+            result = subprocess.run([str(hailo_container_bash_path), "--config-id", self.__config_id], check=True)
+
+            if result.returncode == 0:
+                logger.info(f"ALL FILES CREATED CORRECTLY!")
+                return
+
+        except ChildProcessError as e:
+            logger.error(f"Chil Process Error starting the child process to create the Fusion .hef files.\nThe specific error is: {e}")
+            exit(1)
+        except Exception as e:
+            logger.critical(f"Encountered a generic problem starting the child process to create the Fusion .hef files.\nThe specific error is: {e}")
+            exit(1)
+
+        logger.error(f"The subprocess exited with code {result.returncode}. Exiting...")
+        exit(1)
+
+
+    def initialize(self):
+        self.__createCalibrationData()
+        self.__createFusionModels()
+
+    def getConfig(self):
+        return self.__config
+    
+    def getConfigID(self):
+        return self.__config_id
+
+
 if __name__ == "__main__":
 
-    config_id = "6bae1867a5_generic"
+    # config_id = "6bae1867a5_generic"
+
+    config_id = "1ce0af586313_fusion"
 
     config = {
         "models": [
@@ -197,44 +277,53 @@ if __name__ == "__main__":
                 "weights_path": "ModelData/Weights/mobilenet_v2.pth",
                 "device": "cpu",
                 "class_name": "mobilenet_v2",
-                "weights_class": "MobileNet_V2_Weights.DEFAULT", 
-                "image_size": 224, 
+                "weights_class": "MobileNet_V2_Weights.DEFAULT",
+                "image_size": 224,
                 "num_classes": 2,
                 "task": "classification",
                 "description": "Mobilenet V2 from torchvision"
-            }, 
-            {
-                "model_name": "efficientnet",
-                "native": True,
-                "weights_class": "EfficientNet_B0_Weights"
             },
             {
-                'module': 'torchvision.models',
-                'model_name': "mnasnet1_0",
-                'native': False,
-                'weights_path': "ModelData/Weights/mnasnet1_0.pth",
-                'device': "cpu",
-                'class_name': 'mnasnet1_0',
-                'weights_class': 'MNASNet1_0_Weights.DEFAULT',
-                'image_size': 224,
-                'num_classes': 2,
+                "module": "torchvision.models",
+                "model_name": "efficientnet",
+                "native": True,
+                "weights_path": "./ModelData/Weights/casting_efficientnet_b0.pth",
+                "device": "cpu",
+                "class_name": "efficientnet_b0",
+                "weights_class": "EfficientNet_B0_Weights.DEFAULT",
+                "image_size": 224,
+                "num_classes": 2,
                 "task": "classification",
-                'description': 'mnasnet_v2 from torchvision'
+                "description": "EfficientNet from torchvision"
+            },
+            {
+                "module": "torchvision.models",
+                "model_name": "mnasnet1_0",
+                "native": False,
+                "weights_path": "ModelData/Weights/mnasnet1_0.pth",
+                "device": "cpu",
+                "class_name": "mnasnet1_0",
+                "weights_class": "MNASNet1_0_Weights.DEFAULT",
+                "image_size": 224,
+                "num_classes": 2,
+                "task": "classification",
+                "description": "mnasnet_v2 from torchvision"
             }
         ],
         "optimizations": {
-            "Quantization": {
-                "method": "QInt8",
-                "type": "static"
-            }, 
             "Pruning": {
                 "method": "LnStructured",
-                'n': 1, 
-                "amount": 0.1
+                "n": 1,
+                "amount": 0.1,
+                "epochs": 1
             },
-            "Distillation":{
+            "Distillation": {
                 "method": True,
-                "distilled_paths": {}
+                "distilled_paths": {
+                    "mobilenet_v2": "/home/frabru99/Sync/MasterThesis/MargisBench/ModelData/Weights/mobilenet_v2_distilled.pth",
+                    "efficientnet": "/home/frabru99/Sync/MasterThesis/MargisBench/ModelData/Weights/efficientnet_b0_distilled.pth",
+                    "mnasnet1_0": "/home/frabru99/Sync/MasterThesis/MargisBench/ModelData/Weights/mnasnet1_0_distilled.pth"
+                }
             }
         },
         "dataset": {
@@ -242,11 +331,17 @@ if __name__ == "__main__":
             "batch_size": 1
         },
         "repetitions": 2,
-        "platform": "generic"
+        "platform": "fusion",
+        "arch": "x86_64"
     }
 
 
-    coral_init = CoralInizializer(config, config_id)
-    coral_init.createCalibrationData()
-    coral_init.createCoralModels()
-    coral_init.compileCoralModelsForEdgeTPU()
+    # coral_init = CoralInizializer(config, config_id) 
+    # coral_init.createCalibrationData()
+    # coral_init.createCoralModels()
+    # coral_init.compileCoralModelsForEdgeTPU()
+   
+
+    fusion_init = FusionInitializer(config, config_id)
+    #fusion_init.createCalibrationData()
+    fusion_init.initialize()

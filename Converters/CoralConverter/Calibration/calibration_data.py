@@ -12,7 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 
 # --- CONFIGURATION ---
-DATA_DIR = str(PROJECT_ROOT / "ModelData" / "Dataset" / "casting_data")
+DATA_DIR = str(PROJECT_ROOT / "ModelData" / "Dataset" / "casting_data") #CHANGE THE DATASET HERE
 NUM_SAMPLES = 200 
 
 def generate_calibration_data(model_name, model_weights, batch_size, image_size):

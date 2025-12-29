@@ -216,7 +216,7 @@ function parse_args() {
         fi
 
         
-	shift
+    shift
     done
     
 }
@@ -239,12 +239,13 @@ function prepare_docker_args() { #MODIFIED
                  --name $CONTAINER_NAME \
                  -v /var/run/docker.sock:/var/run/docker.sock \
                  -v /etc/machine-id:/etc/machine-id:ro \
-                 -v ../utilsfile/localtime:/etc/localtime \
+                 -v ./Converters/FusionConverter/utilsfile/localtime:/etc/localtime \
                  -v /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket \
                  -v $(pwd)/${SHARED_DIR}/:/local/${SHARED_DIR}:rw \
                  -v /etc/timezone/timezone:/etc/timezone:ro  
-                 -v ../../../ModelData/ONNXModels/${CONFIG_ID}:/local/workspace/ONNXModels \
-                 -v ../HefModels:/local/workspace/HefModels:rw                 
+                 -v ./ModelData/ONNXModels/${CONFIG_ID}:/local/workspace/ONNXModels \
+                 -v ./Converters/FusionConverter/HefModels:/local/workspace/HefModels:rw \
+                 -v ./Converters/FusionConverter/Calibration/CalibrationArrays:/local/workspace/CalibrationArrays:rw 
                  "
     if [[ -d "/var/lib/dkms" ]]; then
          DOCKER_ARGS+="-v /var/lib/dkms:/var/lib/dkms "
@@ -276,11 +277,11 @@ function load_hailo_ai_sw_suite_image() {
     docker load -i $DOCKER_FILE_PATH
 }
 
-function run_hailo_ai_sw_suite_image() {
+function run_hailo_ai_sw_suite_image() { #CHANGED
     prepare_docker_args
-    RUN_CMD="docker run --rm  ${DOCKER_ARGS} -ti $1"
+    RUN_CMD="docker run --rm  ${DOCKER_ARGS} $1 /bin/bash -c 'cd HefModels/ && ./compile.sh'"
     echo -e "${CYAN}Running Hailo AI SW suite Docker image with the folowing Docker command:${WHITE}" && echo $RUN_CMD
-    $RUN_CMD
+    eval $RUN_CMD
 }
 
 function check_docker_install_and_user_permmision() {
@@ -311,7 +312,7 @@ function overide_container() {
         echo -e "${CYAN}Overriding old container${WHITE}"
         docker stop "$CONTAINER_NAME" > /dev/null
         docker rm "$CONTAINER_NAME" > /dev/null
-	NUM_OF_CONTAINERS_EXSISTS=$(docker ps -a -q -f "name=$CONTAINER_NAME" | wc -l)
+    NUM_OF_CONTAINERS_EXSISTS=$(docker ps -a -q -f "name=$CONTAINER_NAME" | wc -l)
     fi
     run_new_container
 }
