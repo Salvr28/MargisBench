@@ -5,7 +5,8 @@ import numpy as np
 from importlib import import_module
 from pathlib import Path
 from torchvision import datasets, transforms
-from torchvision.models import efficientnet_b0, EfficientNet_B0_Weights, mnasnet1_0, MNASNet1_0_Weights,  MobileNet_V2_Weights, mobilenet_v2
+from torchvision.models import efficientnet_b0, EfficientNet_B0_Weights, mnasnet1_0, MNASNet1_0_Weights,  MobileNet_V2_Weights, mobilenet_v2 #CHANGE HERE
+from torchvision.transforms import Compose, Resize, CenterCrop, PILToTensor
 from torch.utils.data import DataLoader
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
@@ -24,10 +25,22 @@ def generate_calibration_data(model_name, model_weights, batch_size, image_size)
     module = import_module("torchvision.models")
     weight_class = getattr(module, model_weights)
     weights = getattr(weight_class, 'DEFAULT')
-    official_transforms = weights.transforms()
+
+    #official_transforms = weights.transforms()
+
+    transform_config = weights.transforms()
+    resize_size = transform_config.resize_size
+    crop_size = transform_config.crop_size
+    interpolation = transform_config.interpolation
+
+    calibration_transform = Compose([
+        Resize(resize_size, interpolation=interpolation),
+        CenterCrop(crop_size),
+        PILToTensor()  
+    ])
 
     # Load dataset
-    dataset = datasets.ImageFolder(root=DATA_DIR, transform=official_transforms)
+    dataset = datasets.ImageFolder(root=DATA_DIR, transform=calibration_transform)
     loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
     print(f"Found {len(dataset)} images. Collecting {NUM_SAMPLES} samples...")
@@ -79,6 +92,6 @@ if __name__ == "__main__":
     batch_size = args[2]
     image_size = args[3]
 
-    print (f"I get the following args: {model_name} | {model_weights} | {batch_size} |  {image_size}")
+    print (f"I get the following args: {model_name} | {model_weights}")
 
     generate_calibration_data(model_name, model_weights, batch_size, image_size)

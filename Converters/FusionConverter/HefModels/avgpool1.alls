@@ -1,2 +1,3 @@
 pre_quantization_optimization(global_avgpool_reduction, layers=[avgpool1], division_factors=[2, 2])
 performance_param(compiler_optimization_level=0)
+normalization1 = normalization([123.675, 116.28, 103.53], [58.395, 57.12, 57.375])

@@ -17,8 +17,8 @@ NUM_SAMPLES = 200
 
 def generate_calibration_data(model_name, model_weights, batch_size, image_size):
 
-    BATCH_SIZE = batch_size
-    IMAGE_SIZE = image_size
+    BATCH_SIZE = int(batch_size)
+    IMAGE_SIZE = int(image_size)
 
     # Getting the Image Transformations (Normalization, Resize etc) from officials
     module = import_module("torchvision.models")

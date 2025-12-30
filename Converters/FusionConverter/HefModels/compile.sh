@@ -2,16 +2,16 @@
 
 
 source ../hailo_virtualenv/bin/activate
-echo "[PARSING]"
-echo ""
-for file in ../ONNXModels/*.onnx; do
-    echo ""
-    echo "PARSING ${file} ..."
-    echo ""
-    filename=$(echo $file | cut -d "." -f 3 | cut -d "/" -f 3)
-    hailo parser onnx --hw-arch hailo8 --har-path ./har_files/${filename}.har $file
-    rm *.log
-done
+# echo "[PARSING]"
+# echo ""
+# for file in ../ONNXModels/*.onnx; do
+#     echo ""
+#     echo "PARSING ${file} ..."
+#     echo ""
+#     filename=$(echo $file | cut -d "." -f 3 | cut -d "/" -f 3)
+#     hailo parser onnx --hw-arch hailo8 --har-path ./har_files/${filename}.har $file
+#     rm *.log
+# done
 
 echo "PARSING COMPLETED CORRECTLY! PASSING TO OPTIMIZATION..."
 echo "[OPTIMIZATION]"
