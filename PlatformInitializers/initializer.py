@@ -22,7 +22,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 #####
 
 
-class Initializers():
+class Initializers(ABC):
 
     @abstractclassmethod
     def initialize():
