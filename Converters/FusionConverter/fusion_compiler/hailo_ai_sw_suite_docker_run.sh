@@ -279,7 +279,8 @@ function load_hailo_ai_sw_suite_image() {
 
 function run_hailo_ai_sw_suite_image() { #CHANGED
     prepare_docker_args
-    RUN_CMD="docker run --rm  ${DOCKER_ARGS} $1 /bin/bash -c 'cd HefModels/ && ./compile.sh'"
+    #RUN_CMD="docker run --rm  ${DOCKER_ARGS} $1 /bin/bash -c 'cd HefModels/ && ./compile.sh'"
+    RUN_CMD="docker run --rm  ${DOCKER_ARGS} -ti $1 "
     echo -e "${CYAN}Running Hailo AI SW suite Docker image with the folowing Docker command:${WHITE}" && echo $RUN_CMD
     eval $RUN_CMD
 }

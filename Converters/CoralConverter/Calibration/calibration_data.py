@@ -76,6 +76,6 @@ if __name__ == "__main__":
     batch_size = args[2]
     image_size = args[3]
 
-    print (f"I get the following args: {model_name} | {model_weights}")
+    print (f"I get the following args: {model_name} | {model_weights} | {batch_size} | {image_size}")
 
     generate_calibration_data(model_name, model_weights, batch_size, image_size)

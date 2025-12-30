@@ -5,6 +5,7 @@ logger = getLogger(__name__)
 
 import os
 import sys
+import numpy as np
 import subprocess
 from pathlib import Path
 from abc import ABC, abstractclassmethod
@@ -73,6 +74,17 @@ class CoralInizializer(Initializers):
         config_id = self.getConfigID()
         onnx_path = PROJECT_ROOT / "ModelData" / "ONNXModels" / config_id
 
+
+        #DUMMY FILE FOR ONNX2TF CONVERSION
+        dummy_file = os.path.join(os.getcwd(), "calibration_image_sample_data_20x128x128x3_float32.npy")
+
+        if not os.path.exists(dummy_file):
+            print(f"Generating dummy {dummy_file} in {os.getcwd()} to bypass download...")
+            dummy_data = np.random.rand(1, 3, 224, 224).astype(np.float32)
+            np.save(dummy_file, dummy_data)
+
+                
+
         for model_config in self.getConfig()["models"]:
             model_name = model_config['model_name']
             
@@ -85,7 +97,8 @@ class CoralInizializer(Initializers):
             createPathDirectory(base_out_dir)
 
             if not base_tflite.exists():
-                logger.info(f"Converting base model: {model_name}")
+                logger.info(f"CONVERTING BASE MODEL: {model_name}")
+                
                 base_cmd = [
                     onnx2tf_path, "-i", base_onnx, "-o", str(base_out_dir),
                     "-oiqt", "-iqd", "int8", "-oqd", "int8", "-qt", "per-tensor", 
@@ -94,6 +107,7 @@ class CoralInizializer(Initializers):
                 subprocess.run(base_cmd, env=sub_env)
             else:
                 logger.info(f"Base Tflite Model already exists at {base_tflite}")
+
 
             # Optimized Models Conversion 
             opts = self.getConfig().get("optimizations", {})
@@ -114,7 +128,7 @@ class CoralInizializer(Initializers):
                 if os.path.exists(opti_onnx):
                     createPathDirectory(opti_out_dir)
                     if not opti_tflite.exists():
-                        logger.info(f"Converting {opti_key} model: {model_name}")
+                        logger.info(f"CONVERTING {opti_key} MODEL: {model_name}")
                         opti_cmd = [
                             onnx2tf_path, "-i", opti_onnx, "-o", str(opti_out_dir),
                             "-oiqt", "-iqd", "int8", "-oqd", "int8", "-qt", "per-tensor", 
@@ -126,6 +140,7 @@ class CoralInizializer(Initializers):
                 else:
                     logger.warning(f"Expected optimized model {opti_onnx} not found. Skipping.")
 
+        os.remove(dummy_file)
 
     def __compileCoralModelsForEdgeTPU(self):
 
@@ -336,12 +351,12 @@ if __name__ == "__main__":
     }
 
 
-    # coral_init = CoralInizializer(config, config_id) 
+    coral_init = CoralInizializer(config, config_id) 
     # coral_init.createCalibrationData()
     # coral_init.createCoralModels()
     # coral_init.compileCoralModelsForEdgeTPU()
    
 
-    fusion_init = FusionInitializer(config, config_id)
+    #fusion_init = FusionInitializer(config, config_id)
     #fusion_init.createCalibrationData()
-    fusion_init.initialize()
+    coral_init.initialize()
