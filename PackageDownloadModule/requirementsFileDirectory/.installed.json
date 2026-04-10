@@ -1,5 +1,5 @@
 {
-  "generic": false,
-  "coral": false,
-  "fusion_844_ai": false
+    "generic": true,
+    "coral": false,
+    "fusion_844_ai": false
 }

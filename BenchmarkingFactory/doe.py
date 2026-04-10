@@ -106,6 +106,7 @@ class DoE():
             self.__repetitions = config["repetitions"] 
             self.__model_info=config["models"]
             self.__optimizations_info=config["optimizations"]
+            self.__optimization_stacks = self.__initializeOptimizationStacks(config["optimizations"])
             self.__dataset_info = config["dataset"]
             self.__models=self.__initializeListOfModels(config["models"])
             self.__optimizations=self.__initializeListOfOptimizations(config["optimizations"])
@@ -144,7 +145,7 @@ class DoE():
         return ai_models_dict
 
 
-    def __initializeListOfOptimizations(self, optimizations: Dict[str, Any]) -> List[Tuple[Optimization, str]]:
+    def __initializeListOfOptimizations(self, optimizations: Dict[str, Any]) -> Dict[str, Optimization]:
         """ 
         Internal function that initializes the optimization objects based on the config.
 
@@ -155,27 +156,72 @@ class DoE():
 
         Returns
         -------
-        - optimization_object_list: list
-          List of tuples containing (OptimizationObject, OptimizationName)
+        - optimization_object_map: dict
+          Dictionary containing {OptimizationName: OptimizationObject}
         """
         
-        optimization_object_list=[]
+        optimization_object_map = {}
+        available_optimization_names = {"Pruning", "Quantization", "Distillation"}
 
         try:
         
             for optimization_name in optimizations.keys():
+                if optimization_name not in available_optimization_names:
+                    continue
                 full_class_name=f"{optimization_name}Optimization"
                 target_class = getattr(optimization, full_class_name)
 
                 optimization_object = target_class(optimizations[optimization_name])
-                optimization_object_list.append((optimization_object, optimization_name))
+                optimization_object_map[optimization_name] = optimization_object
                 logger.info(f"{full_class_name} ADDED!")
 
         except (FileNotFoundError,Exception) as e:
             logger.error(f"Encountered a generic problem initializing the list of optimizations.\nThe specific error is: {e}.")
   
 
-        return optimization_object_list
+        return optimization_object_map
+
+    def __initializeOptimizationStacks(self, optimizations: Dict[str, Any]) -> List[List[str]]:
+        """
+        Builds the ordered list of optimization stacks (levels) to execute.
+        If not explicitly present in config, falls back to legacy behavior:
+        Base + one optimization per level.
+        """
+        configured_stacks = optimizations.get("stacks")
+        if configured_stacks is not None:
+            if not isinstance(configured_stacks, list):
+                logger.error("Invalid optimization stacks format. Expected a list of optimization stacks.")
+                return [[]]
+            sanitized_stacks: List[List[str]] = []
+            for stack in configured_stacks:
+                if not isinstance(stack, list):
+                    logger.warning(f"Skipping invalid stack entry: {stack}")
+                    continue
+                if len(stack) == 0: # base model
+                    sanitized_stacks.append([])
+                    continue
+                sanitized_stack = [opt for opt in stack if opt in self.__optimizations_info]
+                if len(sanitized_stack) != len(stack):
+                    logger.warning(f"Skipping invalid stack {stack}: contains unknown optimizations.")
+                    continue
+                sanitized_stacks.append(sanitized_stack)
+            if len(sanitized_stacks) == 0:
+                return [[]]
+            return sanitized_stacks
+
+        # Backward compatible fallback.
+        fallback_stacks = [[]]
+        for opt_name in self.__optimizations_info.keys():
+            if opt_name == "stacks":
+                continue
+            fallback_stacks.append([opt_name])
+        return fallback_stacks
+
+    def __stackToLevelName(self, stack: List[str]) -> str:
+        """Converts stack representation to human-readable optimization level."""
+        if not stack:
+            return "Base"
+        return "+".join(stack)
         
 
 
@@ -206,16 +252,15 @@ class DoE():
 
         initialPrint("DESIGN OF EXPERIMENTS\n")
         models_list = []
-        optimization_list = []
+        optimization_levels = []
 
         for model_name in self.__models.keys():
             models_list.append(model_name)
             
-        optimization_list.append("Base")
-        for opt_obj, opt_name in self.__optimizations:
-            optimization_list.append(opt_name)
+        for stack in self.__optimization_stacks:
+            optimization_levels.append(self.__stackToLevelName(stack))
 
-        design = list(product(models_list, optimization_list))
+        design = list(product(models_list, optimization_levels))
 
         self.__printDesign(design)
         full_design = []
@@ -265,22 +310,32 @@ class DoE():
             self.__inference_loaders[model_dict['Base'].getInfo("model_name")]=inference_loader #N Base Models = N Loaders
             model_dict['Base'].createOnnxModel(inference_loader, self.__config_id)
 
-            #Optimized Model...
-            for optimizator, op_name in self.__optimizations:
+            # Stacked optimized models...
+            calibration_samples = 30
+            calibration_loader = dataset.getCalibrationLoader(num_samples=calibration_samples)
 
-                calibration_samples = 30
+            for stack in self.__optimization_stacks:
+                if len(stack) == 0:
+                    continue  # Base already created.
 
-                calibration_loader = dataset.getCalibrationLoader(num_samples = calibration_samples)
+                current_model = model_dict['Base']
+                for optimization_name in stack:
+                    optimizator = self.__optimizations[optimization_name]
+                    optimizator.setAIModel(current_model)
+                    current_model, already_created = optimizator.applyOptimization(
+                        self.__steps,
+                        inference_loader,
+                        calibration_loader,
+                        finetune_loader,
+                        self.__config_id
+                    )
 
-                optimizator.setAIModel(model_dict['Base'])
-                optimized_model, already_created = optimizator.applyOptimization(self.__steps, inference_loader, calibration_loader, finetune_loader, self.__config_id)
+                    if not current_model.getInfo("model_name").endswith("quantized") and not already_created:
+                        current_model.createOnnxModel(inference_loader, self.__config_id)
 
-                if not optimized_model.getInfo("model_name").endswith("quantized") and not already_created:
-                    optimized_model.createOnnxModel(inference_loader, self.__config_id)
-
-                #optimized_models.append(optimized_model)
-                model_dict[op_name] = optimized_model
-                self.__inference_loaders[optimized_model.getInfo("model_name")] = inference_loader
+                level_name = self.__stackToLevelName(stack)
+                model_dict[level_name] = current_model
+                self.__inference_loaders[current_model.getInfo("model_name")] = inference_loader
 
         #self.__models.extend(optimized_models)
         self.__initialized=True

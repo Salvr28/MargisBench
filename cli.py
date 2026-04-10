@@ -7,6 +7,7 @@ import argparse
 import json
 import sys
 import questionary
+from itertools import combinations
 from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
 from rich.console import Console
@@ -228,6 +229,30 @@ def create_interactive_config(context):
             "distilled_paths": {} 
         }
 
+
+    initialPrint("OPTIMIZATION STACKS")
+    stack_candidates = [["Base", []]]
+    stack_order = ["Distillation", "Pruning", "Quantization"]
+    available_ordered = [name for name in stack_order if name in selected_opts]
+
+    for size in range(1, len(available_ordered) + 1):
+        for combo in combinations(available_ordered, size):
+            stack_candidates.append(("+".join(combo), list(combo)))
+
+    selected_stack_labels = questionary.checkbox(
+        "Select optimization levels to benchmark (stacked, ordered):",
+        choices=[label for label, _ in stack_candidates]
+    ).ask()
+
+    if not selected_stack_labels:
+        selected_stack_labels = ["Base"]
+
+    selected_stacks = []
+    for label, stack in stack_candidates:
+        if label in selected_stack_labels:
+            selected_stacks.append(stack)
+
+    optimizations_dict["stacks"] = selected_stacks
 
     initialPrint("DATASET PARAMETERS")
     dataset_path = questionary.path("Path to dataset:", default="ModelData/Dataset/casting_data").ask()

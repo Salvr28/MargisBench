@@ -31,6 +31,7 @@ models_weights_path = str(PROJECT_ROOT / "ModelData" / "Weights") #weights of em
 VALID_CHOICES = {'y','n'} #Choices for CPU Usage
 OPTIMIZATIONS_NEED_ARCH = {"Quantization"} #Optimizations that needs the arch type of the system.
 OPTIMIZATION_NEED_N = {"LnStructured"} #Optimizations methods that needs the 'n' parameter
+OPTIMIZATION_EXECUTION_ORDER = ["Distillation", "Pruning", "Quantization"]
 BLUE = "\x1b[34m"
 RESET = "\x1b[0m"
 
@@ -374,6 +375,65 @@ class ConfigManager(ABC):
 
             optimizations['Distillation']['distilled_paths'][model_dict['model_name']] =  f"{models_weights_path}/{best_file_name}"           
 
+    def _validateAndNormalizeStacks(self, optimizations: Dict[str, Any]) -> bool:
+        """
+        Validates stack definitions and normalizes them to the configured optimizations.
+        Falls back to legacy behaviour (Base + one optimization per level) when missing.
+        """
+        configured_optimizations = [key for key in optimizations.keys() if key != "stacks"]
+        stacks = optimizations.get("stacks")
+
+        if stacks is None:
+            # Backward-compatible default levels.
+            optimizations["stacks"] = [[]] + [[opt_name] for opt_name in configured_optimizations]
+            return True
+
+        if not isinstance(stacks, list) or len(stacks) == 0:
+            logger.error("The 'stacks' field must be a non-empty list.")
+            return False
+
+        order_idx = {name: idx for idx, name in enumerate(OPTIMIZATION_EXECUTION_ORDER)}
+        normalized_stacks = []
+
+        for stack in stacks:
+            if not isinstance(stack, list):
+                logger.error(f"Invalid optimization stack format: {stack}")
+                return False
+
+            if len(stack) == 0:
+                normalized_stacks.append([])
+                continue
+
+            if len(set(stack)) != len(stack):
+                logger.error(f"Duplicated optimization in stack {stack}")
+                return False
+
+            for opt_name in stack:
+                if opt_name not in configured_optimizations:
+                    logger.error(f"Optimization '{opt_name}' in stack {stack} is not configured in 'optimizations'.")
+                    return False
+
+            # Enforce framework-safe order:
+            # Distillation -> Pruning -> Quantization
+            idx_sequence = [order_idx.get(opt_name, -1) for opt_name in stack]
+            if any(idx < 0 for idx in idx_sequence):
+                logger.error(f"Unsupported optimization found in stack {stack}")
+                return False
+            if idx_sequence != sorted(idx_sequence):
+                logger.error(
+                    f"Invalid optimization order in stack {stack}. "
+                    "Allowed order is Distillation -> Pruning -> Quantization."
+                )
+                return False
+
+            normalized_stacks.append(stack)
+
+        if [] not in normalized_stacks:
+            normalized_stacks.insert(0, [])
+
+        optimizations["stacks"] = normalized_stacks
+        return True
+
 
     def loadConfigFile(self, path : Optional[str]=config_path ) -> Tuple[Dict[str, Union[List, Dict, int]], str]:
         """
@@ -543,7 +603,8 @@ class ConfigManagerGeneric(ConfigManager):
                 key: set(value) for key, value in optimizations_library.items()
             }
 
-            for optimization_name in optimizations.keys():
+            optimization_names = [key for key in optimizations.keys() if key != "stacks"]
+            for optimization_name in optimization_names:
 
                 if optimization_name not in optimizations_library_sets:
                     logger.info(f"THE OPTIMIZATION {optimization_name} IS NOT AVAILABLE. REMOVING IT FROM CONFIG FILE...")
@@ -570,9 +631,12 @@ class ConfigManagerGeneric(ConfigManager):
                 logger.critical("NO OPTIMIZATIONS PRESENT IN THE CONFIGURATION.")
                 return False
 
-            if "Distillation" in optimizations.keys():
+            if "Distillation" in optimization_names:
                 if optimizations['Distillation']['method']:
                     self._createDistilledPaths(optimizations, model_dicts)
+
+            if not self._validateAndNormalizeStacks(optimizations):
+                return False
             
             self._printConfigFile(optimizations, " OPTIMIZATIONS SECTION ")
 
@@ -643,7 +707,8 @@ class ConfigManagerCoral(ConfigManager):
                     optimizations_library_sets[key] = value
 
 
-            for optimization_name in optimizations.keys():
+            optimization_names = [key for key in optimizations.keys() if key != "stacks"]
+            for optimization_name in optimization_names:
 
                 if optimization_name not in optimizations_library_sets:
                     logger.info(f"THE OPTIMIZATION {optimization_name} IS NOT AVAILABLE. REMOVING IT FROM CONFIG FILE...")
@@ -670,9 +735,12 @@ class ConfigManagerCoral(ConfigManager):
                 logger.critical("NO OPTIMIZATIONS PRESENT IN THE CONFIGURATION.")
                 return False
 
-            if "Distillation" in optimizations.keys():
+            if "Distillation" in optimization_names:
                 if optimizations['Distillation']['method']:
                     self._createDistilledPaths(optimizations, model_dicts)
+
+            if not self._validateAndNormalizeStacks(optimizations):
+                return False
             
             self._printConfigFile(optimizations, " OPTIMIZATIONS SECTION ")
 

@@ -125,6 +125,18 @@
                         }
                     }
                 }
+            },
+            "stacks": {
+                "description": "Ordered optimization stacks used as DoE levels. Empty stack [] means Base model.",
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "enum": ["Distillation", "Pruning", "Quantization"]
+                    },
+                    "uniqueItems": true
+                },
+                "minItems": 1
             }
         },
         "maxItems": 1
